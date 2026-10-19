@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Decalogue — Neon Screensaver</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Orbitron:wght@500;700&display=swap');
+
+  :root {
+    --bg: #030308;
+    --grid: #080c14;
+    --text: #e2e8f0;
+    --accent: #00f0ff;
+    --dim: #1e293b;
+    --sabbath: #d946ef;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier Prime', monospace;
+  }
+
+  /* Fullscreen Canvas Background */
+  canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    image-rendering: pixelated;
+    background: var(--bg);
+    z-index: 1;
+  }
+
+  /* Overlay UI Layer */
+  .overlay-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 10;
+    pointer-events: none; /* Let clicks pass through to canvas unless on UI */
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 2rem;
+    transition: opacity 0.4s ease;
+  }
+
+  .interactive {
+    pointer-events: auto;
+  }
+
+  /* Top Bar */
+  .top-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    width: 100%;
+  }
+
+  .header-info h1 {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(1.2rem, 3vw, 1.8rem);
+    color: var(--accent);
+    text-shadow: 0 0 15px rgba(0, 240, 255, 0.5);
+    letter-spacing: 0.15em;
+  }
+
+  .subtitle {
+    color: #94a3b8;
+    font-size: 0.85rem;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+  }
+
+  .top-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  /* Legend Container (Hideable) */
+  .legend-container {
+    position: absolute;
+    top: 5rem;
+    left: 2rem;
+    width: 320px;
+    max-height: calc(100vh - 10rem);
+    background: rgba(5, 8, 15, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0, 240, 255, 0.2);
+    border-radius: 8px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+    transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+  }
+
+  .legend-container.hidden {
+    transform: translateX(-120%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .rules {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .rule {
+    background: rgba(17, 24, 39, 0.6);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-left: 3px solid var(--dim);
+    padding: 0.5rem 0.7rem;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    transition: all 0.25s;
+  }
+
+  .rule.active {
+    border-left-color: var(--accent);
+    background: rgba(15, 23, 42, 0.8);
+  }
+
+  .rule.sabbath {
+    border-left-color: var(--sabbath);
+    background: rgba(30, 17, 48, 0.8);
+  }
+
+  .rule-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.68rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    margin-bottom: 0.15rem;
+  }
+
+  .rule.sabbath .rule-num { color: var(--sabbath); }
+  .rule-text { color: #cbd5e1; line-height: 1.3; }
+
+  /* Bottom Bar */
+  .bottom-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    width: 100%;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.9);
+  }
+
+  .status {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.9rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+    background: rgba(3, 3, 8, 0.7);
+    padding: 0.4rem 0.8rem;
+    border-radius: 4px;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    backdrop-filter: blur(4px);
+  }
+
+  .status.sabbath { 
+    color: var(--sabbath); 
+    border-color: rgba(217, 70, 239, 0.4);
+  }
+
+  .controls {
+    display: flex;
+    gap: 0.5rem;
+    background: rgba(3, 3, 8, 0.7);
+    padding: 0.4rem;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(4px);
+  }
+
+  button {
+    background: rgba(0, 240, 255, 0.05);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem;
+    padding: 0.4rem 0.8rem;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    border-radius: 3px;
+    transition: all 0.2s;
+  }
+
+  button:hover {
+    background: var(--accent);
+    color: var(--bg);
+    box-shadow: 0 0 12px var(--accent);
+  }
+
+  /* Scrollbar design for legend */
+  .legend-container::-webkit-scrollbar { width: 4px; }
+  .legend-container::-webkit-scrollbar-track { background: transparent; }
+  .legend-container::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.3); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<canvas id="grid"></canvas>
+
+<div class="overlay-layer">
+  <!-- Top Bar -->
+  <div class="top-bar">
+    <div class="header-info">
+      <h1>DECALOGUE</h1>
+      <div class="subtitle">High-Spectrum Cellular Automaton Screensaver</div>
+    </div>
+    <div class="top-controls">
+      <button class="interactive" id="toggle-legend">HIDE LEGEND (H)</button>
+    </div>
+  </div>
+
+  <!-- Hideable Rules Legend -->
+  <div class="legend-container interactive" id="legend">
+    <div class="rules">
+      <div class="rule" data-rule="1">
+        <div class="rule-num">I · ONE LAW</div>
+        <div class="rule-text">There is only one set of laws. No foreign rulesets may be introduced.</div>
+      </div>
+      <div class="rule" data-rule="2">
+        <div class="rule-num">II · NO IDOLS</div>
+        <div class="rule-text">Still patterns are temporary. Cells that do not change eventually dissolve.</div>
+      </div>
+      <div class="rule" data-rule="3">
+        <div class="rule-num">III · TRUE COUNT</div>
+        <div class="rule-text">Every neighborhood must be counted honestly. No false tallies.</div>
+      </div>
+      <div class="rule" data-rule="4">
+        <div class="rule-num">IV · SABBATH</div>
+        <div class="rule-text">Every 7th generation the Grid rests. All cells age but none are born or die.</div>
+      </div>
+      <div class="rule" data-rule="5">
+        <div class="rule-num">V · HONOR THE ELDERS</div>
+        <div class="rule-text">Older cells may be renewed only by the precise attention of three neighbors.</div>
+      </div>
+      <div class="rule" data-rule="6">
+        <div class="rule-num">VI · PRESERVE LIFE</div>
+        <div class="rule-text">A living cell with 1, 3, or 5 neighbors is protected and shall not be extinguished.</div>
+      </div>
+      <div class="rule" data-rule="7">
+        <div class="rule-num">VII · FIDELITY</div>
+        <div class="rule-text">Birth requires exact conditions. Mixed or impure neighborhoods produce nothing.</div>
+      </div>
+      <div class="rule" data-rule="8">
+        <div class="rule-num">VIII · NO THEFT OF LIFE</div>
+        <div class="rule-text">A void cell may receive life only when it has exactly 2 or exactly 4 living neighbors.</div>
+      </div>
+      <div class="rule" data-rule="9">
+        <div class="rule-num">IX · HONEST WITNESS</div>
+        <div class="rule-text">The state of every cell is public. No hidden or deferred updates.</div>
+      </div>
+      <div class="rule" data-rule="10">
+        <div class="rule-num">X · AGAINST COVETING</div>
+        <div class="rule-text">Dense clusters are unstable. Overcrowding (6+ neighbors) brings swift death.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom Bar -->
+  <div class="bottom-bar">
+    <div class="status" id="status">Generation 0</div>
+    <div class="controls interactive">
+      <button id="play">PAUSE</button>
+      <button id="step">STEP</button>
+      <button id="clear">CLEAR</button>
+      <button id="random">RANDOM</button>
+      <button id="seed">SEED CROSS</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('grid');
+const ctx = canvas.getContext('2d');
+
+// Dynamic Resolution configuration for Fullscreen
+const COLS = 128; // Higher definition grid
+const ROWS = 72;
+let cellWidth, cellHeight;
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  cellWidth = canvas.width / COLS;
+  cellHeight = canvas.height / ROWS;
+}
+window.addEventListener('resize', resizeCanvas);
+resizeCanvas();
+
+let grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+let running = true;
+let generation = 0;
+let sabbath = false;
+let restFrames = 0;
+
+// Vibrant Neon Color Spectrum mapping for cellular ages
+function getCellColor(age) {
+  if (age <= 2) return '#00ffff';      // Electric Cyan (Newborn)
+  if (age <= 6) return '#00ff66';      // Neon Emerald
+  if (age <= 10) return '#ccff00';     // Acid Lime
+  if (age <= 15) return '#ffcc00';     // Vivid Amber
+  if (age <= 20) return '#ff3366';     // Hot Pink / Coral
+  return '#9333ea';                    // Deep Electric Purple (Ancient/Elders)
+}
+
+function draw() {
+  ctx.fillStyle = '#030308';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const age = grid[y][x];
+      if (age > 0) {
+        ctx.fillStyle = getCellColor(age);
+        // Soft glowing aesthetic effect with slight pixel gap
+        ctx.fillRect(x * cellWidth + 0.5, y * cellHeight + 0.5, cellWidth - 1, cellHeight - 1);
+      }
+    }
+  }
+}
+
+function countNeighbors(x, y) {
+  let n = 0;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const nx = (x + dx + COLS) % COLS;
+      const ny = (y + dy + ROWS) % ROWS;
+      if (grid[ny][nx] > 0) n++;
+    }
+  }
+  return n;
+}
+
+function step() {
+  generation++;
+
+  // Rule IV — Sabbath
+  if (generation % 7 === 0) {
+    sabbath = true;
+    restFrames = 25;
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (grid[y][x] > 0) grid[y][x]++;
+      }
+    }
+    updateStatus(true);
+    highlight(4);
+    draw();
+    return;
+  }
+
+  const next = grid.map(row => row.slice());
+
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      const age = grid[y][x];
+      const n = countNeighbors(x, y);
+
+      if (age === 0) {
+        // Rule VIII — Birth on 2 or 4
+        if (n === 2 || n === 4) {
+          next[y][x] = 1;
+        }
+      } else {
+        // Rule X — Overcrowding death
+        if (n >= 6) {
+          next[y][x] = 0;
+          continue;
+        }
+
+        // Rule VI — Survival on 1, 3, or 5
+        const survives = (n === 1 || n === 3 || n === 5);
+        if (!survives) {
+          next[y][x] = 0;
+          continue;
+        }
+
+        let newAge = age + 1;
+
+        // Rule V — Elders renewed by exactly 3 neighbors
+        if (newAge > 12 && n === 3) {
+          newAge = 4;
+        }
+
+        // Rule II — Anti-still-life dissolution via old age
+        if (newAge > 24) {
+          next[y][x] = 0;
+        } else {
+          next[y][x] = newAge;
+        }
+      }
+    }
+  }
+
+  grid = next;
+  updateStatus(false);
+  draw();
+  highlightActive();
+}
+
+function updateStatus(isSabbath) {
+  const el = document.getElementById('status');
+  if (isSabbath) {
+    el.textContent = `SABBATH · Gen ${generation} · Grid Rests`;
+    el.classList.add('sabbath');
+  } else {
+    el.textContent = `Generation ${generation} · Spectrum Active`;
+    el.classList.remove('sabbath');
+  }
+}
+
+function highlight(num) {
+  document.querySelectorAll('.rule').forEach(r => {
+    r.classList.remove('active', 'sabbath');
+    if (+r.dataset.rule === num) {
+      r.classList.add(num === 4 ? 'sabbath' : 'active');
+    }
+  });
+}
+
+function highlightActive() {
+  document.querySelectorAll('.rule').forEach(r => {
+    const n = +r.dataset.rule;
+    r.classList.remove('active', 'sabbath');
+    if ([1,2,5,6,7,8,10].includes(n)) r.classList.add('active');
+  });
+}
+
+function randomize() {
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      grid[y][x] = Math.random() < 0.2 ? Math.floor(Math.random() * 5) + 1 : 0;
+    }
+  }
+  generation = 0;
+  sabbath = false;
+  draw();
+  updateStatus(false);
+  highlightActive();
+}
+
+function clearGrid() {
+  grid = Array.from({length: ROWS}, () => Array(COLS).fill(0));
+  generation = 0;
+  sabbath = false;
+  draw();
+  updateStatus(false);
+  highlightActive();
+}
+
+function seedCross() {
+  clearGrid();
+  const cx = Math.floor(COLS / 2);
+  const cy = Math.floor(ROWS / 2);
+  const shape = [
+    [0,1],[0,2],[0,3],
+    [1,0],[1,4],
+    [2,0],[2,2],[2,4],
+    [3,0],[3,4],
+    [4,1],[4,2],[4,3]
+  ];
+  for (const [dx, dy] of shape) {
+    if (cy + dy - 2 < ROWS && cx + dx - 2 < COLS) {
+      grid[cy + dy - 2][cx + dx - 2] = 1;
+      grid[cy + dy - 2][cx + dx + 15] = 1; // secondary cluster
+    }
+  }
+  draw();
+  highlight(1);
+}
+
+// Controls Logic
+const playBtn = document.getElementById('play');
+playBtn.onclick = () => {
+  if (sabbath) return;
+  running = !running;
+  playBtn.textContent = running ? 'PAUSE' : 'PLAY';
+};
+
+document.getElementById('step').onclick = () => {
+  if (sabbath) return;
+  running = false;
+  playBtn.textContent = 'PLAY';
+  step();
+};
+
+document.getElementById('clear').onclick = clearGrid;
+document.getElementById('random').onclick = randomize;
+document.getElementById('seed').onclick = seedCross;
+
+// Toggle Legend Feature
+const legend = document.getElementById('legend');
+const toggleLegendBtn = document.getElementById('toggle-legend');
+
+function toggleLegend() {
+  legend.classList.toggle('hidden');
+  toggleLegendBtn.textContent = legend.classList.contains('hidden') ? 'SHOW LEGEND (H)' : 'HIDE LEGEND (H)';
+}
+
+toggleLegendBtn.onclick = toggleLegend;
+
+// Shortcut key 'H' to hide/show rules legend
+window.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'h') {
+    toggleLegend();
+  }
+});
+
+// Canvas Drawing / Interactive Painting Support
+let painting = false;
+canvas.addEventListener('mousedown', e => {
+  painting = true;
+  paintCell(e.clientX, e.clientY);
+});
+canvas.addEventListener('mousemove', e => {
+  if (!painting) return;
+  paintCell(e.clientX, e.clientY);
+});
+window.addEventListener('mouseup', () => painting = false);
+
+function paintCell(clientX, clientY) {
+  const x = Math.floor(clientX / cellWidth);
+  const y = Math.floor(clientY / cellHeight);
+  if (x >= 0 && x < COLS && y >= 0 && y < ROWS) {
+    grid[y][x] = grid[y][x] ? 0 : 1;
+    draw();
+  }
+}
+
+// Main Screensaver Animation Loop (throttled frame pacing for smooth evolution)
+let lastTime = 0;
+const fps = 18; // Speed of generation steps
+const interval = 1000 / fps;
+
+function loop(timestamp) {
+  if (!lastTime) lastTime = timestamp;
+  const delta = timestamp - lastTime;
+
+  if (delta > interval) {
+    lastTime = timestamp - (delta % interval);
+    if (sabbath) {
+      restFrames--;
+      if (restFrames <= 0) {
+        sabbath = false;
+        updateStatus(false);
+        highlightActive();
+      }
+    } else if (running) {
+      step();
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+// Initial Launch Configuration
+randomize();
+highlightActive();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
